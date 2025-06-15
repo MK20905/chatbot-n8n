@@ -63,7 +63,3 @@ curl -X POST https://<n8n-domain>/webhook/receiveMessage \
 { "message": "Here is the summary of the policy documents: ..." }
 ```
 
-## License
-
-This project is licensed under the MIT License. 
-```
