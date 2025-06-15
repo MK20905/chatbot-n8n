@@ -1,0 +1,1050 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "receiveMessage",
+        "options": {}
+      },
+      "name": "ReceiveUserMessage",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -280,
+        180
+      ],
+      "id": "796ffbe9-419d-4dae-982f-fdcfd2919223",
+      "webhookId": "aaa5929d-a437-4638-83f0-e21dfcd5a874"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Replace the old code entirely with:\n\nconst incoming = $node[\"ReceiveUserMessage\"].json.body || {};\n\nreturn [{\n  json: {\n    userId: incoming.userId || \"\",\n    userName: incoming.userName || \"\",\n    sessionId: incoming.sessionId || \"\",\n    messageText: incoming.messageText ? incoming.messageText.toString().trim() : \"\"\n  }\n}];\n"
+      },
+      "name": "NormalizeAndLogIncoming",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        180
+      ],
+      "id": "6dacd533-8a66-4de9-8d66-0098f1a42388"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"NormalizeAndLogIncoming\"].json[\"messageText\"].toLowerCase()}}\n",
+              "operation": "contains",
+              "value2": "human"
+            },
+            {
+              "value1": "={{$node[\"NormalizeAndLogIncoming\"].json[\"messageText\"].toLowerCase()}}",
+              "operation": "contains",
+              "value2": "agent"
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "name": "CheckEscalationIntent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        200,
+        180
+      ],
+      "id": "05b475fd-b62c-452c-947c-51c991c7d71f"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "replyText",
+              "value": "Hi there! I'm connecting you to a real agent now. Please hold on a moment—we'll be in touch shortly!"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "AcknowledgeHumanRequest",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        440,
+        40
+      ],
+      "id": "06d2066b-3318-4b83-85ad-c5c12a5c090d"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "sheetId": "1MkKHNPISWkao7zIDxej7uEfVXeog79gIlQyyy80AaRU",
+        "options": {}
+      },
+      "name": "LogEscalation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [
+        980,
+        80
+      ],
+      "id": "30a42cda-529f-4943-8534-5b391b5429ab",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "oU3W4xPcTd9Px1Hj",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "searchQuery",
+              "value": "={{ \n  \"(\" +\n    $json.messageText.match(/\\w+/g)\n      .filter(w=>w.length>2)\n      .map(w=>`name contains '${w}'`)\n      .join(\") or (\")\n  + \")\" \n}}\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "PrepareDriveSearchQuery",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        200,
+        500
+      ],
+      "id": "25ebe9a4-2e13-48a2-afaa-3c0f67d9b606"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "list",
+        "useQueryString": true,
+        "queryString": "={{\n  \"'\" +\n    \"1oXosG3Ojj1amKU4Uj0mMsxtUhJnYfXZW\" +\n  \"' in parents and (\" +\n    (($json.messageText||\"\").match(/\\w+/g)||[])\n      .filter(w => w.length > 2)\n      .map(w => \"name contains '\" + w.toLowerCase() + \"'\")\n      .join(\" or \") +\n  \")\"\n}}\n",
+        "limit": 5,
+        "options": {}
+      },
+      "name": "SearchFilesInDrive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [
+        440,
+        700
+      ],
+      "id": "af239011-007b-4f84-8d9b-43e53cc6910f",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "5T9rxfjV45JrokU9",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $input.first().json.id ? 1 : 0 }}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "name": "FoundAnyDriveFile?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        580
+      ],
+      "id": "87e03413-b22c-4000-ad09-f59657b0355e"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "botReply",
+              "value": "=I’m sorry, I couldn’t find any document related to \"{{ $node[\"NormalizeAndLogIncoming\"].json[\"messageText\"] }}\". Would you like to talk to a human agent instead? Please type “Human” or “Agent” to proceed."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "NoDriveFileFallback",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        720
+      ],
+      "id": "17996804-db1c-4105-8553-50f63bbbc93c"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "name": "DownloadTopFile",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [
+        1580,
+        520
+      ],
+      "id": "103d2b29-8742-4000-b96d-12730d35601b",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "5T9rxfjV45JrokU9",
+          "name": "Google Drive account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "prompt",
+              "value": "={{ \n  `User asked: \"${$node[\"NormalizeAndLogIncoming\"].json.messageText}\"\\n\\n` +\n  `Here are the documents:\\n` +\n  $items(\"Combine\")\n    .map(i => i.json.combinedPrompt)\n    .filter(Boolean)\n    .join(\"\\n\\n---\\n\\n\") +\n  `\\n\\nPlease answer the question based only on the above.` \n}}\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "BuildLLMPayload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        4840,
+        520
+      ],
+      "id": "d33e02e3-1b31-4653-ac7f-cd37d3242614"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "botReply",
+              "value": "={{ $('Gemini1').item.json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "PrepareBotResponse",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        5640,
+        440
+      ],
+      "id": "26e105c9-bcd8-4b19-a910-0026f04d07c9"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "sheetId": "1jr0mo3medDDTuoelww-M-HH5eWLcZZQ3KvYXYF69OTE",
+        "range": "A:G",
+        "options": {}
+      },
+      "name": "LogInteraction",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [
+        6340,
+        20
+      ],
+      "id": "6babf8cb-0d7b-4488-b7b3-caf136dde82e",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "oU3W4xPcTd9Px1Hj",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"message\": $json.botReply || $json.replyText || \"No response available\" } }}",
+        "options": {}
+      },
+      "name": "RespondToWebhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        7200,
+        -120
+      ],
+      "id": "45b5529e-cdcf-4378-b8cb-d4dbdfcb2ee2"
+    },
+    {
+      "parameters": {
+        "sendTo": "minhkhangvmc@gmai.com",
+        "subject": "Approved message",
+        "message": "=A user wants to talk to a human now.\n\n• Name: {{$node[\"NormalizeAndLogIncoming\"].json[\"userName\"]}}\n• User ID: {{$node[\"NormalizeAndLogIncoming\"].json[\"userId\"]}}\n• Session ID: {{$node[\"NormalizeAndLogIncoming\"].json[\"sessionId\"]}}\n• User’s Message: \"{{$node[\"NormalizeAndLogIncoming\"].json[\"messageText\"]}}\"\n\nPlease respond to them in the chat interface or call them if necessary.\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1540,
+        0
+      ],
+      "id": "717ad5ad-f2a9-43d5-aa89-a26de7cd910e",
+      "name": "Gmail",
+      "webhookId": "5f99b7d0-c74f-45a2-97c1-10bb44f0eee9",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "45GcxnD8yhy4loTF",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4523aa3d-2047-44f0-9d41-adc98f277f8f",
+              "name": "=Timestamp",
+              "value": "={{ $now }}",
+              "type": "string"
+            },
+            {
+              "id": "ad20c7cc-c93b-4f00-ab67-6d6fa68037b5",
+              "name": "userId",
+              "value": "={{ $('NormalizeAndLogIncoming').item.json.userId }}",
+              "type": "string"
+            },
+            {
+              "id": "06cc6b30-07c6-4611-b50b-984ad76acb07",
+              "name": "userName",
+              "value": "={{ $('NormalizeAndLogIncoming').item.json.userName }}",
+              "type": "string"
+            },
+            {
+              "id": "3f75fc46-af00-496e-9a96-00c28c656225",
+              "name": "sessionId",
+              "value": "={{ $('NormalizeAndLogIncoming').item.json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "c77b2952-8220-42d3-b1e6-2e8c56f62b86",
+              "name": "messageText",
+              "value": "={{ $('NormalizeAndLogIncoming').item.json.messageText }}",
+              "type": "string"
+            },
+            {
+              "id": "e757d626-672a-4246-91ee-910907cfaf0a",
+              "name": "EscalationStatus",
+              "value": "WaitingForAgent",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        40
+      ],
+      "id": "b1afed17-17ea-463b-ae53-7f0c6f4d6cd8",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "557e41c4-393a-4067-b290-2267e0ea6c38",
+              "name": "Timestamp",
+              "value": "={{ $now }}",
+              "type": "string"
+            },
+            {
+              "id": "70280c16-52d4-4864-a67c-a8020231c476",
+              "name": "userId",
+              "value": "={{ $('NormalizeAndLogIncoming').item.json.userId }}",
+              "type": "string"
+            },
+            {
+              "id": "fa172b2a-50c7-46fa-95d9-6cb3b1a1bbda",
+              "name": "userName",
+              "value": "={{ $('NormalizeAndLogIncoming').item.json.userName }}",
+              "type": "string"
+            },
+            {
+              "id": "a602188b-f779-4d0f-8142-efa09d233b07",
+              "name": "sessionId",
+              "value": "={{ $('NormalizeAndLogIncoming').item.json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "f14f1462-daaf-4636-8656-42302ec9c6f8",
+              "name": "messageText",
+              "value": "={{ $('NormalizeAndLogIncoming').item.json.messageText }}",
+              "type": "string"
+            },
+            {
+              "id": "5c36b83d-89c9-4f33-a00e-15cc193377eb",
+              "name": "botOrHuman",
+              "value": "={{$('AcknowledgeHumanRequest').all().length > 0 ? \"Human\" : ($('PrepareBotResponse').all().length > 0 ? \"Bot - File Found\" : ($('NoDriveFileFallback').all().length > 0 ? \"Bot - No File\" : \"Bot\"))}}",
+              "type": "string"
+            },
+            {
+              "id": "2d2d193c-0d04-470d-adc0-299c9daa09a1",
+              "name": "botReply",
+              "value": "={{$('AcknowledgeHumanRequest').all().length > 0 ? $('AcknowledgeHumanRequest').first().json.replyText : ($('PrepareBotResponse').all().length > 0 ? $('PrepareBotResponse').first().json.botReply : ($('NoDriveFileFallback').all().length > 0 ? $('NoDriveFileFallback').first().json.botReply : \"Unknown response path\"))}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1460,
+        -160
+      ],
+      "id": "a0c6b71d-40d6-448b-8c6e-520045bfd0dd",
+      "name": "PrepareLogdataforhuman"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "557e41c4-393a-4067-b290-2267e0ea6c38",
+              "name": "Timestamp",
+              "value": "={{ $now }}",
+              "type": "string"
+            },
+            {
+              "id": "70280c16-52d4-4864-a67c-a8020231c476",
+              "name": "userId",
+              "value": "={{ $items(\"NormalizeAndLogIncoming\").first().json.userId }}",
+              "type": "string"
+            },
+            {
+              "id": "fa172b2a-50c7-46fa-95d9-6cb3b1a1bbda",
+              "name": "userName",
+              "value": "={{ $items(\"NormalizeAndLogIncoming\").first().json.userName }}",
+              "type": "string"
+            },
+            {
+              "id": "a602188b-f779-4d0f-8142-efa09d233b07",
+              "name": "sessionId",
+              "value": "={{ $items(\"NormalizeAndLogIncoming\").first().json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "f14f1462-daaf-4636-8656-42302ec9c6f8",
+              "name": "messageText",
+              "value": "={{ $items(\"NormalizeAndLogIncoming\").first().json.messageText }}",
+              "type": "string"
+            },
+            {
+              "id": "5c36b83d-89c9-4f33-a00e-15cc193377eb",
+              "name": "botOrHuman",
+              "value": "=Bot",
+              "type": "string"
+            },
+            {
+              "id": "2d2d193c-0d04-470d-adc0-299c9daa09a1",
+              "name": "botReply",
+              "value": "={{ $json.botReply }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5900,
+        180
+      ],
+      "id": "b0255b1e-fce5-4f83-aff8-2aaa12c8bec5",
+      "name": "PrepareLogdataforhuman1"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "documentURL": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        3520,
+        300
+      ],
+      "id": "e8e0a595-cc97-48fd-8255-1020f962f112",
+      "name": "Google Docs",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "QMDEXn6cWKM0wjIX",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        5420,
+        320
+      ],
+      "id": "ce7b2778-6fe9-495b-8f27-b088a68dc525",
+      "name": "Gemini",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "tFJsmuUcTHzwd1Bh",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{$('BuildLLMPayload').item.json.prompt}}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        5260,
+        540
+      ],
+      "id": "553540ed-5e69-43d2-a983-0b5ca15916ea",
+      "name": "Gemini1"
+    },
+    {
+      "parameters": {
+        "operation": "Convert from PDF",
+        "url": "=https://drive.google.com/file/d/{{$json.id}}/view?usp=share_link",
+        "advancedOptions": {}
+      },
+      "type": "n8n-nodes-pdfco.PDFco Api",
+      "typeVersion": 1,
+      "position": [
+        3560,
+        840
+      ],
+      "id": "dbc53e61-ff03-44b9-b8d4-8cf7cf8e027a",
+      "name": "PDFco Api1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "pdfcoApi": {
+          "id": "CKi9twrSgs6H86Md",
+          "name": "PDF.co account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3780,
+        840
+      ],
+      "id": "14623be5-234e-45f9-809a-3d4c5691eaf6",
+      "name": "Get Data from pdf",
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "426a19c5-7ffe-4a42-82d3-3a3c24ffb471",
+              "leftValue": "={{ $('SearchFilesInDrive').item.json.name }}",
+              "rightValue": "pdf",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1860,
+        580
+      ],
+      "id": "8963a6af-5921-4c86-bf37-b97407105870",
+      "name": "Checkingtypedocument"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1e128640-db67-4571-af70-0f630fe4aa5d",
+              "name": "data",
+              "value": "={{ $json.content }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3740,
+        300
+      ],
+      "id": "8e311e52-d147-4745-ba1a-8cbce075ebb1",
+      "name": "Changetype"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Function: CombineAllForLLM\nconst allTexts = items\n  .map(i => i.json.data || \"\")\n  .filter(t => t)\n  .join(\"\\n\\n---\\n\\n\");\n\nreturn [{ json: { combinedPrompt:\n   `Please read these documents and summarize them in one cohesive answer:\\n\\n${allTexts}` \n}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4460,
+        440
+      ],
+      "id": "e9075705-2b52-4a46-9e45-acd5e51b887e",
+      "name": "Combine"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        4200,
+        480
+      ],
+      "id": "62526b1d-b5a8-4015-92e0-387a65bf14b4",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\nreturn items.filter(item => {\n  const name = item.json.name;\n  if (typeof name !== 'string') return false;\n  const normalized = name.toLowerCase();\n  if (seen.has(normalized)) return false;\n  seen.add(normalized);\n  return true;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        700
+      ],
+      "id": "8ed1a603-054a-4d0e-a03c-b462abb44b52",
+      "name": "CheckingDuplicate",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/drive/v2/files/{{ $json.id }}/copy?convert=true&supportsAllDrives=true",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2080,
+        420
+      ],
+      "id": "ca7cfaf6-3e6b-4cd1-919c-f325075f2aca",
+      "name": "Word docx to docs file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "5T9rxfjV45JrokU9",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "ReceiveUserMessage": {
+      "main": [
+        [
+          {
+            "node": "NormalizeAndLogIncoming",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NormalizeAndLogIncoming": {
+      "main": [
+        [
+          {
+            "node": "CheckEscalationIntent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckEscalationIntent": {
+      "main": [
+        [
+          {
+            "node": "AcknowledgeHumanRequest",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PrepareDriveSearchQuery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PrepareDriveSearchQuery": {
+      "main": [
+        [
+          {
+            "node": "SearchFilesInDrive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SearchFilesInDrive": {
+      "main": [
+        [
+          {
+            "node": "CheckingDuplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FoundAnyDriveFile?": {
+      "main": [
+        [
+          {
+            "node": "DownloadTopFile",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Checkingtypedocument",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoDriveFileFallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NoDriveFileFallback": {
+      "main": [
+        [
+          {
+            "node": "PrepareLogdataforhuman1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DownloadTopFile": {
+      "main": [
+        [
+          {
+            "node": "Checkingtypedocument",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BuildLLMPayload": {
+      "main": [
+        [
+          {
+            "node": "Gemini1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PrepareBotResponse": {
+      "main": [
+        [
+          {
+            "node": "PrepareLogdataforhuman1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LogEscalation": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PrepareLogdataforhuman",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AcknowledgeHumanRequest": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail": {
+      "main": [
+        []
+      ]
+    },
+    "LogInteraction": {
+      "main": [
+        [
+          {
+            "node": "RespondToWebhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "LogEscalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PrepareLogdataforhuman": {
+      "main": [
+        [
+          {
+            "node": "LogInteraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PrepareLogdataforhuman1": {
+      "main": [
+        [
+          {
+            "node": "LogInteraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Docs": {
+      "main": [
+        [
+          {
+            "node": "Changetype",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Gemini1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini1": {
+      "main": [
+        [
+          {
+            "node": "PrepareBotResponse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDFco Api1": {
+      "main": [
+        [
+          {
+            "node": "Get Data from pdf",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Data from pdf": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Checkingtypedocument": {
+      "main": [
+        [
+          {
+            "node": "Word docx to docs file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PDFco Api1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Changetype": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine": {
+      "main": [
+        [
+          {
+            "node": "BuildLLMPayload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Combine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckingDuplicate": {
+      "main": [
+        [
+          {
+            "node": "FoundAnyDriveFile?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Word docx to docs file": {
+      "main": [
+        [
+          {
+            "node": "Google Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "88e41c2a-0acc-432f-95c2-1c2572b1a764",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "94038a1259f2a635f2becd0cfcef95275f8b2c074587b7f9d4d1e52c3c9747e4"
+  },
+  "id": "gxHbmaGsbvJlB8gC",
+  "tags": []
+}
