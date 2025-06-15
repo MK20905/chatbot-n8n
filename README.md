@@ -63,23 +63,3 @@ curl -X POST https://<n8n-domain>/webhook/receiveMessage \
 { "message": "Here is the summary of the policy documents: ..." }
 ```
 
-## GitHub Language Configuration
-
-By default, GitHub’s Linguist classifies `.json` files as a data subtype and may not display them under JavaScript. To force JSON files to count as JavaScript in your repo’s language bar:
-
-1. Create a file named `.gitattributes` at your repository root.
-2. Add this line:
-
-   ```gitattributes
-   *.json linguist-language=JavaScript
-   ```
-3. Commit & push:
-
-   ```bash
-   git add .gitattributes
-   git commit -m "Force JSON as JavaScript for GitHub linguist"
-   git push origin main
-   ```
-
-After a short delay, GitHub will reanalyze the repo and display `.json` under JavaScript.
-
